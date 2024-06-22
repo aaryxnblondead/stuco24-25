@@ -1,0 +1,68 @@
+import{jsx as _jsx}from"react/jsx-runtime";import{addPropertyControls,ControlType,useIsInCurrentNavigationTarget}from"framer";import{isMotionValue,useInView}from"framer-motion";import{borderRadiusControl,defaultEvents,useIsBrowserSafari,useIsOnCanvas,useOnEnter,useOnExit,useRadius}from"https://framer.com/m/framer/default-utils.js@^0.45.0";import{memo,useCallback,useEffect,useMemo,useRef,useState}from"react";var
+ObjectFitType;(function(ObjectFitType){ObjectFitType["Fill"]="fill";ObjectFitType["Contain"]="contain";ObjectFitType["Cover"]="cover";ObjectFitType["None"]="none";ObjectFitType["ScaleDown"]="scale-down";})(ObjectFitType||(ObjectFitType={}));var SrcType;(function(SrcType){SrcType["Video"]="Upload";SrcType["Url"]="URL";})(SrcType||(SrcType={}));//
+Reduce renders function getProps(props){const{width,height,topLeft,topRight,bottomRight,bottomLeft,id,children,...rest}=props;return rest;}/** * VIDEO * * @framerIntrinsicWidth 200 * @framerIntrinsicHeight 112 * * @framerSupportedLayoutWidth fixed * @framerSupportedLayoutHeight
+any-prefer-fixed */export function Video(props){const newProps=getProps(props);return /*#__PURE__*/_jsx(VideoMemo,{...newProps});}function usePlaybackControls(videoRef){const isInCurrentNavigationTarget=useIsInCurrentNavigationTarget();const requestingPlay=useRef(false);const
+setProgress=useCallback(rawProgress=>{if(!videoRef.current)return;const newProgress=(rawProgress===1?.999:rawProgress)*videoRef.current.duration;const isAlreadySet=Math.abs(videoRef.current.currentTime-newProgress)
+<.1;if(videoRef.current.duration>0&&!isAlreadySet){videoRef.current.currentTime=newProgress;}},[]);const play=useCallback(()=>{const isPlaying=videoRef.current.currentTime>0&&videoRef.current.onplaying&&!videoRef.current.paused&&!videoRef.current.ended&&videoRef.current.readyState>videoRef.current.HAVE_CURRENT_DATA;if(!isPlaying&&videoRef.current&&!requestingPlay.current&&isInCurrentNavigationTarget){requestingPlay.current=true;videoRef.current.play().catch(e=>{})//
+    It's likely fine, swallow error .finally(()=>requestingPlay.current=false);}},[]);const pause=useCallback(()=>{if(!videoRef.current||requestingPlay.current)return;videoRef.current.pause();},[]);return{play,pause,setProgress};}function useAutoplayBehavior({playingProp,muted,loop,playsinline,controls}){const[initialPlayingProp]=useState(()=>playingProp);const[hasPlayingPropChanged,setHasPlayingPropChanged]=useState(false);if(playingProp!==initialPlayingProp&&!hasPlayingPropChanged){setHasPlayingPropChanged(true);}const
+    behavesAsGif=// passing `playing === true` on mount indicates that the video should // autoplay, like a GIF initialPlayingProp&&muted&&loop&&playsinline&&!controls&&// Some users of the
+    <Video> component use it by wrapping it with
+// another smart component and adding their own controls on top. (The
+// controls use transitions to control the video: e.g., when clicking
+// the play button, the smart component will transition to a state with
+// <Video playing={true} />.) In this case, we don't want the video to
+// behave as a gif, as it will be weird if the video suddenly started
+// acting as such (and auto-pausing when leaving the viewport) as soon
+// as the site visitor mutes it and clicks “Play”.
+!hasPlayingPropChanged;let autoplay;if(behavesAsGif)autoplay="on-viewport";else if(initialPlayingProp)autoplay="on-mount";else autoplay="no-autoplay";return autoplay;}/**
+ * The Video component has some effects that sync the video element with props
+ * like `startTime`, `progress`, etc. React calls these effects whenever these
+ * props change. However, it also calls them on the first mount, and this is
+ * troublesome – if we’re doing SSR, and the user changed the video state before
+ * the video was hydrated, the initial `useEffect` call will reset the video
+ * state. To avoid this, we use this flag.
+ */let isMountedAndReadyForProgressChanges=false;const VideoMemo=/*#__PURE__*/memo(function VideoInner(props){const{srcType,srcFile,srcUrl,playing:playingProp,muted,playsinline,controls,progress,objectFit,backgroundColor,onSeeked,onPause,onPlay,onEnd,onClick,onMouseEnter,onMouseLeave,onMouseDown,onMouseUp,poster,posterEnabled,startTime:startTimeProp,volume,loop}=props;const videoRef=useRef();const isSafari=useIsBrowserSafari();const wasPausedOnLeave=useRef(null);const wasEndedOnLeave=useRef(null);const isOnCanvas=useIsOnCanvas();const borderRadius=useRadius(props);// Hard-coding `autoplayBehavior` and `isInViewport` when on canvas as a
+// tiny perf optimization. isOnCanvas won’t change through the lifecycle of
+// the component, so using these hooks conditionally should be safe
+const autoplayBehavior=isOnCanvas?"no-autoplay":useAutoplayBehavior({playingProp,muted,loop,playsinline,controls});const isInViewport=isOnCanvas?true:useInView(videoRef);// Video elements behave oddly at 100% duration
+const startTime=startTimeProp===100?99.9:startTimeProp;const{play,pause,setProgress}=usePlaybackControls(videoRef);// Pause/play via props
+useEffect(()=>{if(isOnCanvas)return;if(playingProp)play();else pause();},[playingProp]);// Pause/play via viewport
+useEffect(()=>{if(isOnCanvas)return;if(autoplayBehavior!=="on-viewport")return;if(isInViewport)play();else pause();},[autoplayBehavior,isInViewport]);// Allow scrubbling via progress prop
+// 1) Handle cases when the progress prop itself changes
+useEffect(()=>{if(!isMountedAndReadyForProgressChanges){isMountedAndReadyForProgressChanges=true;return;}const rawProgressValue=isMotionValue(progress)?progress.get():(progress!==null&&progress!==void 0?progress:0)*.01;setProgress(// When the progress value exists (e.g. <Video startTime={10}
+// progress={50} />), we respect the `progress` value over
+// `startTime`, even if `startTime` changes. That’s because
+// `startTime` == start == changing it shouldn’t affect the current
+// progress
+(rawProgressValue!==null&&rawProgressValue!==void 0?rawProgressValue:0)||// Then why fall back to `startTime` when `progress` doesn’t exist,
+// you might ask? Now, that’s for
+// - canvas UX: we want the video progress to change when the user
+//   is scrobbling the “Start Time” in component settings.
+// - backwards compatibility: maybe some users *are* scrobbling
+//   using `startTime` instead of `progress`? We don’t know, and it
+//   always supported it, so let’s not break it
+(startTime!==null&&startTime!==void 0?startTime:0)/100);},[startTime,srcFile,srcUrl,progress]);// 2) Handle cases when the motion value inside the progress prop changes
+useEffect(()=>{if(!isMotionValue(progress))return;return progress.on("change",value=>setProgress(value));},[progress]);// (Prototyping) Checking if we need to play on navigation enter
+useOnEnter(()=>{if(wasPausedOnLeave.current===null)return;if(videoRef.current){// if (restartOnEnter) setProgress(0)
+if(!wasEndedOnLeave&&loop||!wasPausedOnLeave.current)play();}});// (Prototyping) Pausing & saving playing state on navigation exit
+useOnExit(()=>{if(videoRef.current){wasEndedOnLeave.current=videoRef.current.ended;wasPausedOnLeave.current=videoRef.current.paused;pause();}});const src=useMemo(()=>{let fragment="";// if (
+//     startTime > 0 &&
+//     videoRef.current &&
+//     !isNaN(videoRef.current.duration) &&
+//     !isOnCanvas
+// ) {
+//     console.log(startTime, videoRef.current.duration)
+//     fragment = `#t=${startTime * videoRef.current.duration}`
+// }
+if(srcType==="URL")return srcUrl+fragment;if(srcType==="Upload")return srcFile+fragment;},[srcType,srcFile,srcUrl,startTime]);// Autoplay via JS to work in Safari
+useEffect(()=>{if(isSafari&&videoRef.current&&autoplayBehavior==="on-mount"){setTimeout(()=>play(),50);}},[]);// Volume Control
+useEffect(()=>{if(videoRef.current&&!muted)videoRef.current.volume=(volume!==null&&volume!==void 0?volume:0)/100;},[volume]);// When video is ready, set start-time, then autoplay if needed
+const handleReady=()=>{if(!videoRef.current)return;if(videoRef.current.currentTime<.3)setProgress((startTime!==null&&startTime!==void 0?startTime:0)*.01);if(autoplayBehavior==="on-mount")play();};return /*#__PURE__*/_jsx("video",{onClick,onMouseEnter,onMouseLeave,onMouseDown,onMouseUp,src:src,loop:loop,ref:videoRef,onSeeked:e=>onSeeked===null||onSeeked===void 0?void 0:onSeeked(e),onPause:e=>onPause===null||onPause===void 0?void 0:onPause(e),onPlay:e=>onPlay===null||onPlay===void 0?void 0:onPlay(e),onEnded:e=>onEnd===null||onEnd===void 0?void 0:onEnd(e),autoPlay:autoplayBehavior==="on-mount",preload:autoplayBehavior!=="on-mount"&&posterEnabled?"metadata":"auto",poster:posterEnabled?poster:undefined,onLoadedData:handleReady,controls:controls,muted:isOnCanvas?true:muted,playsInline:playsinline,style:{cursor:!!onClick?"pointer":"auto",width:"100%",height:"100%",borderRadius,display:"block",objectFit:objectFit,backgroundColor:backgroundColor,objectPosition:"50% 50%"}});});Video.displayName="Video";Video.defaultProps={srcType:"URL",srcUrl:"https://assets.mixkit.co/videos/preview/mixkit-shining-sun-in-the-sky-surrounded-by-moving-clouds-31793-small.mp4",srcFile:"",posterEnabled:false,controls:false,playing:true,loop:true,muted:true,playsinline:true,restartOnEnter:false,objectFit:"cover",backgroundColor:"rgba(0,0,0,0)",radius:0,volume:25,startTime:0};const groupsRegex=/[A-Z]{2,}|[A-Z][a-z]+|[a-z]+|[A-Z]|\d+/gu;function capitalizeFirstLetter(value){return value.charAt(0).toUpperCase()+value.slice(1);}export function titleCase(value){const groups=value.match(groupsRegex)||[];return groups.map(capitalizeFirstLetter).join(" ");}const objectFitOptions=["cover","fill","contain","scale-down","none"];addPropertyControls(Video,{srcType:{type:ControlType.Enum,displaySegmentedControl:true,title:"Source",options:["URL","Upload"]},srcUrl:{type:ControlType.String,title:"URL",placeholder:"../example.mp4",hidden(props){return props.srcType==="Upload";},description:"Hosted video file URL. For YouTube, use the YouTube component."},srcFile:{type:ControlType.File,title:"File",allowedFileTypes:["mp4","webm"],hidden(props){return props.srcType==="URL";}},playing:{type:ControlType.Boolean,title:"Playing",enabledTitle:"Yes",disabledTitle:"No"},posterEnabled:{type:ControlType.Boolean,title:"Poster",enabledTitle:"Yes",disabledTitle:"No"},poster:{type:ControlType.Image,title:" ",hidden:({posterEnabled})=>!posterEnabled},backgroundColor:{type:ControlType.Color,title:"Background"},...borderRadiusControl,startTime:{title:"Start Time",type:ControlType.Number,min:0,max:100,step:.1,unit:"%"},loop:{type:ControlType.Boolean,title:"Loop",enabledTitle:"Yes",disabledTitle:"No"},objectFit:{type:ControlType.Enum,title:"Fit",options:objectFitOptions,optionTitles:objectFitOptions.map(titleCase)},// restartOnEnter: {
+//     type: ControlType.Boolean,
+//     title: "On ReEnter",
+//     enabledTitle: "Restart",
+//     disabledTitle: "Resume",
+// },
+controls:{type:ControlType.Boolean,title:"Controls",enabledTitle:"Show",disabledTitle:"Hide"},muted:{type:ControlType.Boolean,title:"Muted",enabledTitle:"Yes",disabledTitle:"No"},volume:{type:ControlType.Number,max:100,min:0,unit:"%",hidden:({muted})=>muted},onEnd:{type:ControlType.EventHandler},onSeeked:{type:ControlType.EventHandler},onPause:{type:ControlType.EventHandler},onPlay:{type:ControlType.EventHandler},...defaultEvents});
+export const __FramerMetadata__ = {"exports":{"Video":{"type":"reactComponent","name":"Video","slots":[],"annotations":{"framerSupportedLayoutHeight":"any-prefer-fixed","framerIntrinsicHeight":"112","framerSupportedLayoutWidth":"fixed","framerContractVersion":"1","framerIntrinsicWidth":"200"}},"VideoProps":{"type":"tsType","annotations":{"framerContractVersion":"1"}},"titleCase":{"type":"function","annotations":{"framerContractVersion":"1"}},"__FramerMetadata__":{"type":"variable"}}}
+//# sourceMappingURL=./Video.map
